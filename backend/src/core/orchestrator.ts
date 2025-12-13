@@ -8,8 +8,27 @@ export interface CandidateScore {
   score: number;
 }
 
+type ParsedCandidateScores = number[] | null;
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function toNumericScore(value: unknown): number | null {
+  if (isFiniteNumber(value)) return value;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.endsWith("%")) {
+      const percentageValue = Number(trimmed.slice(0, -1));
+      return Number.isFinite(percentageValue) ? percentageValue / 100 : null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 function normalise(scores: number[]): number[] {
@@ -35,10 +54,10 @@ function normaliseByCandidates(candidateIds: string[], rawScores: Map<string, nu
   return normalise(scores);
 }
 
-function parseJsonObject(candidateIds: string[], parsed: unknown): number[] | null {
+function parseJsonObject(candidateIds: string[], parsed: unknown): ParsedCandidateScores {
   if (Array.isArray(parsed)) {
-    if (parsed.every((value) => isFiniteNumber(value)) && parsed.length === candidateIds.length) {
-      return normalise(parsed as number[]);
+    if (parsed.every((value) => toNumericScore(value) !== null) && parsed.length === candidateIds.length) {
+      return normalise(parsed.map((value) => toNumericScore(value) ?? 0));
     }
 
     if (parsed.every((entry) => typeof entry === "object" && entry !== null)) {
@@ -46,10 +65,12 @@ function parseJsonObject(candidateIds: string[], parsed: unknown): number[] | nu
       for (const entry of parsed as Array<Record<string, unknown>>) {
         const candidate = entry.candidate ?? entry.id ?? entry.name ?? entry.index;
         const score = entry.score ?? entry.value ?? entry.rating;
-        if (typeof candidate === "string" && isFiniteNumber(score)) {
-          rawScores.set(candidate, score);
-        } else if (isFiniteNumber(candidate) && isFiniteNumber(score)) {
-          rawScores.set(String(candidate), score);
+        const numericScore = toNumericScore(score);
+
+        if (typeof candidate === "string" && numericScore !== null) {
+          rawScores.set(candidate, numericScore);
+        } else if (isFiniteNumber(candidate) && numericScore !== null) {
+          rawScores.set(String(candidate), numericScore);
         }
       }
 
@@ -62,8 +83,9 @@ function parseJsonObject(candidateIds: string[], parsed: unknown): number[] | nu
   if (parsed && typeof parsed === "object") {
     const rawScores = new Map<string, number>();
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isFiniteNumber(value)) {
-        rawScores.set(key, value);
+      const numericScore = toNumericScore(value);
+      if (numericScore !== null) {
+        rawScores.set(key, numericScore);
       }
     }
 
@@ -75,17 +97,17 @@ function parseJsonObject(candidateIds: string[], parsed: unknown): number[] | nu
   return null;
 }
 
-function parseLineByLine(candidateIds: string[], response: string): number[] | null {
+function parseLineByLine(candidateIds: string[], response: string): ParsedCandidateScores {
   const rawScores = new Map<string, number>();
-  const linePattern = /candidate\s*(?<id>[\w-]+)\s*[:|-]\s*(?<score>[-+]?(?:\d+\.?\d*|\.\d+))/i;
+  const linePattern = /candidate\s*(?<id>[\w-]+)[^\d%\r\n]*?(?<score>[-+]?(?:\d+\.?\d*|\.\d+)(?:%|(?:[eE][-+]?\d+)?))/i;
 
   for (const line of response.split(/\r?\n/)) {
     const match = line.match(linePattern);
     if (!match || !match.groups) continue;
 
     const id = match.groups.id;
-    const score = Number(match.groups.score);
-    if (Number.isFinite(score)) {
+    const score = toNumericScore(match.groups.score);
+    if (score !== null) {
       rawScores.set(id, score);
     }
   }
@@ -97,12 +119,14 @@ function parseLineByLine(candidateIds: string[], response: string): number[] | n
   return null;
 }
 
-function parseEmbeddedJson(candidateIds: string[], response: string): number[] | null {
-  const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/i) || response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+function parseEmbeddedJson(candidateIds: string[], response: string): ParsedCandidateScores {
+  const fencedMatch = response.match(/```json\s*([\s\S]*?)\s*```/i);
+  const braceMatch = response.match(/\{[\s\S]*\}/);
+  const jsonSource = fencedMatch?.[1] ?? braceMatch?.[0];
+  if (!jsonSource) return null;
 
   try {
-    const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    const parsed = JSON.parse(jsonSource);
     return parseJsonObject(candidateIds, parsed);
   } catch (error) {
     return null;
@@ -112,9 +136,15 @@ function parseEmbeddedJson(candidateIds: string[], response: string): number[] |
 export function parseCandidateScores(response: string, candidates: Candidate[]): CandidateScore[] {
   const candidateIds = candidates.map((candidate, index) => candidate.id ?? String(index + 1));
 
-  const parsers: Array<() => number[] | null> = [
+  const parsers: Array<() => ParsedCandidateScores> = [
     () => parseEmbeddedJson(candidateIds, response),
-    () => parseJsonObject(candidateIds, (() => { try { return JSON.parse(response); } catch (error) { return null; } })()),
+    () => {
+      try {
+        return parseJsonObject(candidateIds, JSON.parse(response));
+      } catch (error) {
+        return null;
+      }
+    },
     () => parseLineByLine(candidateIds, response),
   ];
 
