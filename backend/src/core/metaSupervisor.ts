@@ -2,6 +2,16 @@ import { chatComplete } from "../llm/avalaiClient";
 import { ConfigShape, MemoryStoreShape, MetaDecision, AgentConfig } from "./types";
 import { selectProvider } from "../llm/providerSelector";
 
+function chooseObjective(memory: MemoryStoreShape, lastCritiqueSeverity: number): "min_cost" | "max_accuracy" | "balanced" {
+  const totalQuestions = memory.question_history.length || 1;
+  const successes = memory.question_history.filter((q) => q.success).length;
+  const successRate = successes / totalQuestions;
+  const avgAgentCost = Object.values(memory.agent_performance || {}).reduce((acc, perf) => acc + (perf.avgCost || 0), 0);
+  if (lastCritiqueSeverity > 3 || successRate < 0.5) return "max_accuracy";
+  if (avgAgentCost > 5) return "min_cost";
+  return "balanced";
+}
+
 export async function metaSupervisor(
   question: string,
   iteration: number,
@@ -10,9 +20,11 @@ export async function metaSupervisor(
   config: ConfigShape,
   lastCritiqueSeverity: number
 ): Promise<MetaDecision> {
-  const provider = selectProvider(config);
-  const systemPrompt = `You are the Meta-Supervisor orchestrating a debate among agents. Consider memory summaries and choose whether to continue. Output JSON strictly.`;
-  const planPrompt = `Question: ${question}\nIteration: ${iteration}\nPast success rate: ${memory.question_history.length}\nAverage severity last: ${lastCritiqueSeverity}`;
+  const objective = chooseObjective(memory, lastCritiqueSeverity);
+  const provider = selectProvider(config, objective);
+  const model = objective === "max_accuracy" ? "avalai-large" : objective === "balanced" ? "avalai-medium" : "avalai-small";
+  const systemPrompt = `You are the Meta-Supervisor orchestrating a debate among agents. Consider memory summaries, provider rates, and choose whether to continue. Output JSON strictly.`;
+  const planPrompt = `Question: ${question}\nIteration: ${iteration}\nSuccess rate: ${memory.question_history.length ? (memory.question_history.filter((q) => q.success).length / memory.question_history.length).toFixed(2) : "n/a"}\nAverage severity last: ${lastCritiqueSeverity}\nObjective: ${objective}\nCheapest provider: ${provider}`;
 
   const response = await chatComplete(
     [
@@ -24,13 +36,13 @@ export async function metaSupervisor(
           `\nAgents: ${agents.map((a) => `${a.id}:${a.role}:${a.enabled ? "on" : "off"}`).join(", ")}\nReturn JSON with action, explanation, plan, providerStrategy, promptUpdates, createAgents, disableAgents, stopCriteria`,
       },
     ],
-    "avalai-small",
-    0.2
+    model,
+    objective === "max_accuracy" ? 0.3 : 0.2
   );
 
   try {
     const parsed = JSON.parse(response.text);
-    return normalizeDecision(parsed, provider);
+    return normalizeDecision(parsed, provider, objective, model);
   } catch (e) {
     // fallback heuristic
     return {
@@ -43,7 +55,7 @@ export async function metaSupervisor(
         runScoring: true,
         runSelfVerifier: true,
       },
-      providerStrategy: { objective: "balanced", providerOverrides: {}, modelOverrides: {} },
+      providerStrategy: { objective, providerOverrides: { default: provider }, modelOverrides: { default: model } },
       promptUpdates: [],
       createAgents: [],
       disableAgents: [],
@@ -52,7 +64,12 @@ export async function metaSupervisor(
   }
 }
 
-function normalizeDecision(obj: any, fallbackProvider: string): MetaDecision {
+function normalizeDecision(
+  obj: any,
+  fallbackProvider: string,
+  objective: "min_cost" | "max_accuracy" | "balanced",
+  model: string
+): MetaDecision {
   return {
     action: obj.action === "stop" ? "stop" : "continue",
     explanation: obj.explanation || "",
@@ -64,9 +81,9 @@ function normalizeDecision(obj: any, fallbackProvider: string): MetaDecision {
       runSelfVerifier: obj.plan?.runSelfVerifier !== false,
     },
     providerStrategy: {
-      objective: obj.providerStrategy?.objective || "balanced",
+      objective: obj.providerStrategy?.objective || objective,
       providerOverrides: obj.providerStrategy?.providerOverrides || { default: fallbackProvider },
-      modelOverrides: obj.providerStrategy?.modelOverrides || {},
+      modelOverrides: obj.providerStrategy?.modelOverrides || { default: model },
     },
     promptUpdates: Array.isArray(obj.promptUpdates)
       ? obj.promptUpdates.map((p: any) => ({ agentId: p.agentId, newPrompt: p.newPrompt, reason: p.reason || "" }))

@@ -11,7 +11,13 @@ export function initTokenSummary(): TokenUsageSummary {
   };
 }
 
-export function addUsage(summary: TokenUsageSummary, agentId: string, provider: string, rate: { input: number; output: number; reasoning: number }, usage: { inputTokens: number; outputTokens: number; reasoningTokens: number }) {
+export function addUsage(
+  summary: TokenUsageSummary,
+  agentId: string,
+  provider: string,
+  rate: { input: number; output: number; reasoning: number },
+  usage: { inputTokens: number; outputTokens: number; reasoningTokens: number }
+) {
   const { inputTokens, outputTokens, reasoningTokens } = usage;
   const cost = inputTokens * rate.input + outputTokens * rate.output + reasoningTokens * rate.reasoning;
   summary.totalInputTokens += inputTokens;
@@ -28,4 +34,5 @@ export function addUsage(summary: TokenUsageSummary, agentId: string, provider: 
   summary.agentUsage[agentId].output += outputTokens;
   summary.agentUsage[agentId].reasoning += reasoningTokens;
   summary.agentUsage[agentId].cost += cost;
+  return cost;
 }

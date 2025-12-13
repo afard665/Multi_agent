@@ -106,12 +106,19 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
           model,
           agent.temperature
         );
-        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default, {
+        const cost = addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default, {
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
           reasoningTokens: response.reasoningTokens,
         });
-        return { agent_id: agent.id, content: response.text, model, provider, cost: summary.agentUsage[agent.id].cost, usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens } };
+        return {
+          agent_id: agent.id,
+          content: response.text,
+          model,
+          provider,
+          cost,
+          usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens },
+        };
       })
     );
 
