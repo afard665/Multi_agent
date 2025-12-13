@@ -1,0 +1,8 @@
+{
+  "provider_rates": {
+    "default": {"input": 0.0000015, "output": 0.000002, "reasoning": 0.0000025},
+    "avalai": {"input": 0.000001, "output": 0.0000015, "reasoning": 0.000002}
+  },
+  "maxIterations": 5,
+  "maxTokens": 2048
+}

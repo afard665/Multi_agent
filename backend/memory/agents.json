@@ -1,0 +1,8 @@
+[
+  {"id":"responder-1","name":"General Responder","role":"responder","enabled":true,"system_prompt":"You are a helpful responder producing concise answers with citations.","model":"avalai-small","provider":"avalai","temperature":0.6,"max_tokens":512,"createdAt":1690000000000,"updatedAt":1690000000000},
+  {"id":"critic-1","name":"Critic","role":"critic","enabled":true,"system_prompt":"You critique answers, finding weaknesses and unsupported claims.","model":"avalai-small","provider":"avalai","temperature":0.4,"max_tokens":256,"createdAt":1690000000000,"updatedAt":1690000000000},
+  {"id":"opponent-1","name":"Opponent","role":"opponent","enabled":true,"system_prompt":"Act as devil's advocate and challenge assumptions.","model":"avalai-small","provider":"avalai","temperature":0.5,"max_tokens":256,"createdAt":1690000000000,"updatedAt":1690000000000},
+  {"id":"fact-1","name":"Fact Checker","role":"fact_checker","enabled":true,"system_prompt":"Check factual accuracy using provided evidence and flag unsupported claims.","model":"avalai-small","provider":"avalai","temperature":0.3,"max_tokens":256,"createdAt":1690000000000,"updatedAt":1690000000000},
+  {"id":"score-1","name":"Scoring Agent","role":"scoring_agent","enabled":true,"system_prompt":"Score candidate answers from 1-10 considering accuracy and critique severity.","model":"avalai-small","provider":"avalai","temperature":0.2,"max_tokens":128,"createdAt":1690000000000,"updatedAt":1690000000000},
+  {"id":"self-1","name":"Self Verifier","role":"self_verifier","enabled":true,"system_prompt":"Ensure internal consistency and formatting, remove hallucinations.","model":"avalai-small","provider":"avalai","temperature":0.2,"max_tokens":128,"createdAt":1690000000000,"updatedAt":1690000000000}
+]
