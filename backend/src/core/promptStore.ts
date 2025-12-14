@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { PromptVersion } from "./types";
 import { atomicWrite } from "../utils/atomicWrite";
+import { withFileLock } from "../utils/fileLock";
 import { v4 as uuidv4 } from "uuid";
 
 const promptPath = path.join(__dirname, "../../memory/prompt-store.json");
@@ -22,7 +23,9 @@ export class PromptStore {
   }
 
   private async persist() {
-    await atomicWrite(promptPath, JSON.stringify(this.versions, null, 2));
+    await withFileLock(promptPath, async () => {
+      await atomicWrite(promptPath, JSON.stringify(this.versions, null, 2));
+    });
   }
 
   list(agentId: string) {

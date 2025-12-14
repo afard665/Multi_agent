@@ -1,17 +1,32 @@
 import { v4 as uuidv4 } from "uuid";
-import { chatComplete } from "../llm/avalaiClient";
+import { chatComplete } from "../llm/llmClient";
 import { addUsage, initTokenSummary } from "../llm/tokenAccounting";
 import { ConfigShape, AgentConfig, CandidateResponse, CriticOutput, FactCheckResult, ScoreResult, ReasoningTraceEntry } from "./types";
 import { retrieveEvidence } from "./rag";
 import { performFactCheck } from "./factCheck";
 import { chooseFinalAnswer } from "./aggregator";
+import { appendCitationsIfMissing, buildCitations } from "./citations";
 import { metaSupervisor } from "./metaSupervisor";
 import { PromptStore } from "./promptStore";
 import { MemoryStore } from "./memoryStore";
 import { RunStore } from "./runStore";
+import { AgentStore } from "./agentStore";
 import { selectProvider } from "../llm/providerSelector";
 
-export async function runAskFlow(question: string, agents: AgentConfig[], config: ConfigShape, promptStore: PromptStore, memory: MemoryStore, runs: RunStore) {
+export async function runAskFlow(
+  question: string,
+  agents: AgentConfig[],
+  config: ConfigShape,
+  promptStore: PromptStore,
+  memory: MemoryStore,
+  runs: RunStore,
+  agentStore?: AgentStore,
+  opts?: {
+    runId?: string;
+    onIteration?: (entry: ReasoningTraceEntry) => void;
+    onFinal?: (payload: { answer: string; confidence: number; justification: string; tokens: any }) => void;
+  }
+) {
   const summary = initTokenSummary();
   const trace: ReasoningTraceEntry[] = [];
   let lastCritiqueSeverity = 0;
@@ -40,6 +55,11 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
       newAgent.updatedAt = Date.now();
       newAgent.enabled = true;
       agents.push(newAgent);
+
+      // persist dynamic agents so they survive restarts
+      if (agentStore) {
+        await agentStore.add(newAgent);
+      }
     }
 
     // disable agents
@@ -47,6 +67,10 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
       const a = agents.find((ag) => ag.id === id);
       if (a) a.enabled = false;
     }
+
+    // evidence retrieval
+    const evidence = retrieveEvidence(question);
+    const citations = buildCitations(evidence);
 
     // run responders
     const responders = agents.filter((a) => metaDecision.plan.runResponders.includes(a.id) && a.enabled);
@@ -60,19 +84,18 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
             { role: "user", content: question },
           ],
           model,
-          agent.temperature
+          agent.temperature,
+          { provider, providerConfig: config.llm_providers?.[provider] }
         );
-        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default, {
+        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
           reasoningTokens: response.reasoningTokens,
         });
-        return { agent_id: agent.id, content: response.text, model, provider, cost: summary.agentUsage[agent.id].cost, usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens } };
+        const content = appendCitationsIfMissing(response.text, citations);
+        return { agent_id: agent.id, content, model, provider, cost: summary.agentUsage[agent.id].cost, usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens } };
       })
     );
-
-    // evidence retrieval
-    const evidence = retrieveEvidence(question);
 
     // critics/opponents
     const critics = agents.filter((a) => metaDecision.plan.runCritics.includes(a.id) && a.enabled);
@@ -87,9 +110,10 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
             { role: "user", content: `Critique these answers and highlight weaknesses:\n${candidateText}` },
           ],
           model,
-          agent.temperature
+          agent.temperature,
+          { provider, providerConfig: config.llm_providers?.[provider] }
         );
-        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default, {
+        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
           inputTokens: resp.inputTokens,
           outputTokens: resp.outputTokens,
           reasoningTokens: resp.reasoningTokens,
@@ -117,9 +141,10 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
             { role: "user", content: responderOutputs.map((r, idx) => `Candidate ${idx}: ${r.content}`).join("\n") },
           ],
           model,
-          scoringAgent.temperature
+          scoringAgent.temperature,
+          { provider, providerConfig: config.llm_providers?.[provider] }
         );
-        addUsage(summary, scoringAgent.id, provider, config.provider_rates[provider] || config.provider_rates.default, {
+        addUsage(summary, scoringAgent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
           inputTokens: resp.inputTokens,
           outputTokens: resp.outputTokens,
           reasoningTokens: resp.reasoningTokens,
@@ -136,7 +161,7 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
       }));
     }
 
-    trace.push({
+    const entry: ReasoningTraceEntry = {
       iteration,
       agentsRan: responders.map((r) => r.id),
       responderOutputs,
@@ -145,14 +170,18 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
       scores,
       metaDecision,
       evidence,
-    });
+    };
+
+    trace.push(entry);
+    opts?.onIteration?.(entry);
 
     if (metaDecision.action === "stop") break;
     iteration += 1;
   }
 
   const final = chooseFinalAnswer(responderOutputs, criticOutputs, factChecks, scores);
-  const runId = uuidv4();
+  opts?.onFinal?.({ answer: final.answer, confidence: final.confidence, justification: final.justification, tokens: summary });
+  const runId = opts?.runId || uuidv4();
   await runs.add({
     id: runId,
     question,

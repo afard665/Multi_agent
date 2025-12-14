@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { MemoryStoreShape } from "./types";
 import { atomicWrite } from "../utils/atomicWrite";
+import { withFileLock } from "../utils/fileLock";
 
 const memoryPath = path.join(__dirname, "../../memory/meta-memory.json");
 
@@ -21,7 +22,9 @@ export class MemoryStore {
   }
 
   private async persist() {
-    await atomicWrite(memoryPath, JSON.stringify(this.data, null, 2));
+    await withFileLock(memoryPath, async () => {
+      await atomicWrite(memoryPath, JSON.stringify(this.data, null, 2));
+    });
   }
 
   getData() {

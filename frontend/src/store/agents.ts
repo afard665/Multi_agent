@@ -16,7 +16,9 @@ type Agent = {
 type AgentState = {
   agents: Agent[]
   load: () => Promise<void>
+  create: (agent: Partial<Agent>) => Promise<void>
   update: (id: string, patch: Partial<Agent>) => Promise<void>
+  setEnabled: (id: string, enabled: boolean) => Promise<void>
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -25,8 +27,20 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     const res = await api.get('/agents')
     set({ agents: res.data })
   },
+  create: async (agent) => {
+    await api.post('/agents', agent)
+    await get().load()
+  },
   update: async (id, patch) => {
     await api.patch(`/agents/${id}`, patch)
+    await get().load()
+  },
+  setEnabled: async (id, enabled) => {
+    if (enabled) {
+      await api.patch(`/agents/${id}`, { enabled: true })
+    } else {
+      await api.post(`/agents/${id}/disable`)
+    }
     await get().load()
   },
 }))

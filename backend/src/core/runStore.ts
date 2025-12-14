@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { RunRecord } from "./types";
 import { atomicWrite } from "../utils/atomicWrite";
+import { withFileLock } from "../utils/fileLock";
 
 const runsPath = path.join(__dirname, "../../logs/runs.jsonl");
 
@@ -20,8 +21,10 @@ export class RunStore {
   }
 
   async add(run: RunRecord) {
-    const data = fs.existsSync(runsPath) ? fs.readFileSync(runsPath, "utf-8") : "";
-    const newData = data + JSON.stringify(run) + "\n";
-    await atomicWrite(runsPath, newData);
+    await withFileLock(runsPath, async () => {
+      const data = fs.existsSync(runsPath) ? fs.readFileSync(runsPath, "utf-8") : "";
+      const newData = data + JSON.stringify(run) + "\n";
+      await atomicWrite(runsPath, newData);
+    });
   }
 }

@@ -18,6 +18,18 @@ Set environment variables as needed:
 - `AVALAI_API_KEY` optional for AvalAI
 - `AVALAI_BASE_URL` override endpoint
 
+### Live trace (WebSocket)
+The backend exposes a WebSocket server at `ws://localhost:3001/ws`.
+
+To request a live trace stream, POST `/api/ask` with `{ "question": "...", "stream": true }`. The response includes:
+- `runId`
+- `liveTrace.wsUrl`
+- `liveTrace.runId`
+
+The frontend uses this to subscribe and append `iteration` events into `reasoningTrace`.
+
+You can override the advertised WebSocket URL with `LIVE_TRACE_WS_URL`.
+
 ## Running Frontend
 ```
 cd frontend

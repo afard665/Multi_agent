@@ -1,5 +1,9 @@
 import express from "express";
 import cors from "cors";
+import http from "http";
+import { WebSocketServer } from "ws";
+import { LiveTraceHub } from "./ws/liveTraceHub";
+import { llmRequestContextMiddleware } from "./llm/requestContext";
 import { askRouter } from "./routes/ask";
 import { agentsRouter } from "./routes/agents";
 import { logsRouter } from "./routes/logs";
@@ -17,13 +21,22 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+// attach request-scoped LLM overrides (provider/api key/base url)
+app.use(llmRequestContextMiddleware);
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: "/ws" });
+const liveTraceHub = new LiveTraceHub(wss);
+
+app.get("/healthz", (_req, res) => res.json({ ok: true }));
+
 const agentStore = new AgentStore();
 const configStore = new ConfigStore();
 const promptStore = new PromptStore();
 const memoryStore = new MemoryStore();
 const runStore = new RunStore();
 
-app.use("/api", askRouter(agentStore, configStore, promptStore, memoryStore, runStore));
+app.use("/api", askRouter(agentStore, configStore, promptStore, memoryStore, runStore, liveTraceHub));
 app.use("/api", agentsRouter(agentStore));
 app.use("/api", logsRouter(runStore, agentStore, configStore, promptStore, memoryStore));
 app.use("/api", configRouter(configStore));
@@ -36,4 +49,4 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => log(`Backend listening on ${port}`));
+server.listen(port, () => log(`Backend listening on ${port}`));

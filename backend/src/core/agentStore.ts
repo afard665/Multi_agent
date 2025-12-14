@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { AgentConfig } from "./types";
 import { atomicWrite } from "../utils/atomicWrite";
+import { withFileLock } from "../utils/fileLock";
 
 const agentsPath = path.join(__dirname, "../../memory/agents.json");
 
@@ -21,7 +22,9 @@ export class AgentStore {
   }
 
   private async persist() {
-    await atomicWrite(agentsPath, JSON.stringify(this.agents, null, 2));
+    await withFileLock(agentsPath, async () => {
+      await atomicWrite(agentsPath, JSON.stringify(this.agents, null, 2));
+    });
   }
 
   list() {

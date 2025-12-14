@@ -19,7 +19,7 @@ export function logsRouter(runStore: RunStore, agentStore: AgentStore, configSto
   router.post("/logs/:id/replay", async (req, res) => {
     const run = runStore.get(req.params.id);
     if (!run) return res.status(404).json({ error: "not found" });
-    const result = await runAskFlow(run.question, agentStore.list(), configStore.getConfig(), promptStore, memoryStore, runStore);
+    const result = await runAskFlow(run.question, agentStore.list(), configStore.getConfig(), promptStore, memoryStore, runStore, agentStore);
     res.json(result);
   });
   return router;

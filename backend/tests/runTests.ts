@@ -5,12 +5,35 @@ import { atomicWrite } from "../src/utils/atomicWrite";
 import { PromptStore } from "../src/core/promptStore";
 import { aggregateScores } from "../src/core/scoring";
 import { CandidateResponse, CriticOutput, FactCheckResult, ScoreResult } from "../src/core/types";
+import { withFileLock } from "../src/utils/fileLock";
 
 async function testAtomicWrite() {
   const tmp = path.join(__dirname, "tmp.json");
   await atomicWrite(tmp, JSON.stringify({ a: 1 }));
   const data = JSON.parse(fs.readFileSync(tmp, "utf-8"));
   assert.strictEqual(data.a, 1, "atomicWrite should persist data");
+  fs.unlinkSync(tmp);
+}
+
+async function testFileLockSerializes() {
+  const tmp = path.join(__dirname, "tmp-lock.txt");
+  if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+
+  await Promise.all(
+    Array.from({ length: 50 }).map((_, i) =>
+      withFileLock(tmp, async () => {
+        const prev = fs.existsSync(tmp) ? fs.readFileSync(tmp, "utf-8") : "";
+        await atomicWrite(tmp, prev + `${i}\n`);
+      })
+    )
+  );
+
+  const lines = fs
+    .readFileSync(tmp, "utf-8")
+    .split("\n")
+    .filter(Boolean);
+
+  assert.strictEqual(lines.length, 50, "withFileLock should prevent lost updates");
   fs.unlinkSync(tmp);
 }
 
@@ -34,6 +57,7 @@ function testScoring() {
 
 (async () => {
   await testAtomicWrite();
+  await testFileLockSerializes();
   await testPromptStore();
   testScoring();
   console.log("All tests passed");

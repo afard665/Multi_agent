@@ -160,8 +160,17 @@ export interface RunRecord {
   agentsUsed: string[];
 }
 
+export type LlmProviderConfig = {
+  key: string;
+  displayName?: string;
+  baseUrl: string;
+  apiKey: string;
+  models: string[];
+};
+
 export interface ConfigShape {
   provider_rates: Record<string, { input: number; output: number; reasoning: number }>;
+  llm_providers?: Record<string, LlmProviderConfig>;
   maxIterations: number;
   maxTokens: number;
 }

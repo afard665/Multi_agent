@@ -1,6 +1,7 @@
-import { chatComplete } from "../llm/avalaiClient";
+import { chatComplete } from "../llm/llmClient";
 import { ConfigShape, MemoryStoreShape, MetaDecision, AgentConfig } from "./types";
 import { selectProvider } from "../llm/providerSelector";
+import { normalizeMetaDecision } from "./metaDecisionSchema";
 
 export async function metaSupervisor(
   question: string,
@@ -25,12 +26,13 @@ export async function metaSupervisor(
       },
     ],
     "avalai-small",
-    0.2
+    0.2,
+    { provider, providerConfig: config.llm_providers?.[provider] }
   );
 
   try {
     const parsed = JSON.parse(response.text);
-    return normalizeDecision(parsed, provider);
+    return normalizeMetaDecision(parsed, provider, agents);
   } catch (e) {
     // fallback heuristic
     return {
@@ -52,27 +54,4 @@ export async function metaSupervisor(
   }
 }
 
-function normalizeDecision(obj: any, fallbackProvider: string): MetaDecision {
-  return {
-    action: obj.action === "stop" ? "stop" : "continue",
-    explanation: obj.explanation || "",
-    plan: {
-      runResponders: Array.isArray(obj.plan?.runResponders) ? obj.plan.runResponders : [],
-      runCritics: Array.isArray(obj.plan?.runCritics) ? obj.plan.runCritics : [],
-      runFactChecker: !!obj.plan?.runFactChecker,
-      runScoring: obj.plan?.runScoring !== false,
-      runSelfVerifier: obj.plan?.runSelfVerifier !== false,
-    },
-    providerStrategy: {
-      objective: obj.providerStrategy?.objective || "balanced",
-      providerOverrides: obj.providerStrategy?.providerOverrides || { default: fallbackProvider },
-      modelOverrides: obj.providerStrategy?.modelOverrides || {},
-    },
-    promptUpdates: Array.isArray(obj.promptUpdates)
-      ? obj.promptUpdates.map((p: any) => ({ agentId: p.agentId, newPrompt: p.newPrompt, reason: p.reason || "" }))
-      : [],
-    createAgents: Array.isArray(obj.createAgents) ? obj.createAgents : [],
-    disableAgents: Array.isArray(obj.disableAgents) ? obj.disableAgents : [],
-    stopCriteria: obj.stopCriteria || { whyStopNow: "", unresolvedCritiques: 0, factConfidence: 1 },
-  };
-}
+// kept intentionally small: normalization moved to metaDecisionSchema.ts
