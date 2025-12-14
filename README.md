@@ -14,9 +14,11 @@ npm run dev
 ```
 Set environment variables as needed:
 - `PORT` (default 3001)
-- `ADMIN_API_KEY` protects admin actions
+- `ADMIN_API_KEY` required for admin actions (agents/config/logs/memory/prompts)
+- `ALLOW_INSECURE_ADMIN=true` (optional) allows admin actions without a key (local/dev only)
 - `AVALAI_API_KEY` optional for AvalAI
 - `AVALAI_BASE_URL` override endpoint
+- `META_SUPERVISOR_MODEL` (optional) override the meta-supervisor model
 
 ### Live trace (WebSocket)
 The backend exposes a WebSocket server at `ws://localhost:3001/ws`.

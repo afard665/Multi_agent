@@ -44,8 +44,15 @@ export const useSystemStore = create<SystemState>((set, get) => ({
     get().stopStreaming()
     set({ loading: true, traceStatus: 'idle', traceError: undefined })
 
-    const res = await api.post('/ask', { question, stream: !!opts?.stream })
-    const data: AskResponse = res.data
+    let data: AskResponse
+    try {
+      const res = await api.post('/ask', { question, stream: !!opts?.stream })
+      data = res.data
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Request failed'
+      set({ loading: false, traceStatus: 'error', traceError: String(msg), result: undefined })
+      return
+    }
 
     // if streaming, start with empty trace and let WS fill it in
     set({

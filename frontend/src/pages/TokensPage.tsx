@@ -20,9 +20,19 @@ function fmtMoney(n: number) {
 export default function TokensPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [range, setRange] = useState<RangeKey>('7d')
+  const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    api.get('/logs').then((res) => setLogs(res.data))
+    api
+      .get('/logs')
+      .then((res) => {
+        setLogs(res.data)
+        setError('')
+      })
+      .catch((err) => {
+        setLogs([])
+        setError(err?.response?.data?.error || err?.message || 'Failed to load logs')
+      })
   }, [])
 
   const filtered = useMemo(() => {
@@ -62,6 +72,7 @@ export default function TokensPage() {
   return (
     <div className="space-y-4">
       <Card title="Token Usage">
+        {error ? <div className="text-sm text-red-600 mb-2">{error}</div> : null}
         <div className="flex items-center gap-2 mb-3 text-sm">
           <div className="text-gray-600">Time range:</div>
           <select className="border p-2" value={range} onChange={(e) => setRange(e.target.value as RangeKey)}>

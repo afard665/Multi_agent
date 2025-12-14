@@ -48,8 +48,8 @@ export function configRouter(configStore: ConfigStore) {
     res.json(configStore.getConfig());
   });
 
-  // Admin-only provider CRUD
-  router.get("/providers", (req, res) => {
+  // Provider registry (admin-only; includes baseUrls which may be sensitive)
+  router.get("/providers", adminGuard, (req, res) => {
     const cfg = configStore.getConfig();
     res.json(Object.values(cfg.llm_providers || {}).map((p) => ({ key: p.key, displayName: p.displayName, baseUrl: p.baseUrl, models: p.models })));
   });

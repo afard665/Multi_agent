@@ -46,13 +46,27 @@ async function testPromptStore() {
 
 function testScoring() {
   const candidates: CandidateResponse[] = [
-    { agent_id: "a1", content: "answer", model: "m", provider: "p", cost: 1, usage: { inputTokens: 1, outputTokens: 1, reasoningTokens: 0 } },
+    { agent_id: "a1", content: "answer 1", model: "m", provider: "p", cost: 0, usage: { inputTokens: 1, outputTokens: 1, reasoningTokens: 0 } },
+    { agent_id: "a2", content: "answer 2", model: "m", provider: "p", cost: 0, usage: { inputTokens: 1, outputTokens: 1, reasoningTokens: 0 } },
   ];
-  const critics: CriticOutput[] = [{ agent_id: "c1", content: "bad", severity: 1 }];
-  const facts: FactCheckResult[] = [{ agent_id: "fc", unsupportedClaims: [], confidence: 1 }];
-  const scores: ScoreResult[] = [{ candidateId: "a1", score: 5 }];
-  const result = aggregateScores(candidates, critics, facts, scores)[0];
-  assert(result.finalScore > 0, "score should be positive");
+  const critics: CriticOutput[] = [
+    { agent_id: "c1", candidateId: "a1", content: "bad", severity: 4 },
+    { agent_id: "c1", candidateId: "a2", content: "good", severity: 0 },
+  ];
+  const facts: FactCheckResult[] = [
+    { agent_id: "a1", unsupportedClaims: ["x"], confidence: 0.1 },
+    { agent_id: "a2", unsupportedClaims: [], confidence: 1 },
+  ];
+  const scores: ScoreResult[] = [
+    { candidateId: "a1", score: 5 },
+    { candidateId: "a2", score: 5 },
+  ];
+  const result = aggregateScores(candidates, critics, facts, scores);
+  const a1 = result.find((r) => r.candidate.agent_id === "a1")!;
+  const a2 = result.find((r) => r.candidate.agent_id === "a2")!;
+  assert.strictEqual(a1.avgSeverity, 4, "severity should be per-candidate");
+  assert.strictEqual(a1.factConfidence, 0.1, "fact confidence should be per-candidate");
+  assert(a2.finalScore > a1.finalScore, "candidate with better fact/confidence should score higher");
 }
 
 (async () => {

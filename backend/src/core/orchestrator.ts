@@ -13,6 +13,74 @@ import { RunStore } from "./runStore";
 import { AgentStore } from "./agentStore";
 import { selectProvider } from "../llm/providerSelector";
 
+function tryParseJson<T>(text: string): T | null {
+  if (typeof text !== "string") return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    // keep going
+  }
+
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fence?.[1]) {
+    try {
+      return JSON.parse(fence[1]) as T;
+    } catch {
+      // keep going
+    }
+  }
+
+  const start = trimmed.search(/[\[{]/);
+  const end = Math.max(trimmed.lastIndexOf("}"), trimmed.lastIndexOf("]"));
+  if (start !== -1 && end !== -1 && end > start) {
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1)) as T;
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
+function normalizeScores(raw: any, candidateIds: string[]): ScoreResult[] | null {
+  const clampScore = (v: any) => {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(10, n));
+  };
+
+  const seen = new Set<string>();
+  const out: ScoreResult[] = [];
+
+  // Accept either:
+  // - [{ candidateId, score }, ...]
+  // - { [candidateId]: score }
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const candidateId = typeof item?.candidateId === "string" ? item.candidateId : "";
+      if (!candidateId || !candidateIds.includes(candidateId) || seen.has(candidateId)) continue;
+      const score = clampScore(item?.score);
+      if (score == null) continue;
+      seen.add(candidateId);
+      out.push({ candidateId, score });
+    }
+  } else if (raw && typeof raw === "object") {
+    for (const candidateId of candidateIds) {
+      if (!Object.prototype.hasOwnProperty.call(raw, candidateId)) continue;
+      const score = clampScore((raw as any)[candidateId]);
+      if (score == null) continue;
+      seen.add(candidateId);
+      out.push({ candidateId, score });
+    }
+  }
+
+  return out.length ? out : null;
+}
+
 export async function runAskFlow(
   question: string,
   agents: AgentConfig[],
@@ -99,29 +167,47 @@ export async function runAskFlow(
 
     // critics/opponents
     const critics = agents.filter((a) => metaDecision.plan.runCritics.includes(a.id) && a.enabled);
-    criticOutputs = await Promise.all(
-      critics.map(async (agent) => {
-        const provider = metaDecision.providerStrategy.providerOverrides[agent.id] || agent.provider || selectProvider(config);
-        const model = metaDecision.providerStrategy.modelOverrides[agent.id] || agent.model;
-        const candidateText = responderOutputs.map((r) => `${r.agent_id}: ${r.content}`).join("\n");
-        const resp = await chatComplete(
-          [
-            { role: "system", content: agent.system_prompt },
-            { role: "user", content: `Critique these answers and highlight weaknesses:\n${candidateText}` },
-          ],
-          model,
-          agent.temperature,
-          { provider, providerConfig: config.llm_providers?.[provider] }
-        );
-        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
-          inputTokens: resp.inputTokens,
-          outputTokens: resp.outputTokens,
-          reasoningTokens: resp.reasoningTokens,
-        });
-        const severity = Math.min(5, Math.max(0, resp.text.length / 200));
-        return { agent_id: agent.id, content: resp.text, severity };
-      })
-    );
+    criticOutputs =
+      responderOutputs.length === 0
+        ? []
+        : await Promise.all(
+            critics.flatMap((agent) =>
+              responderOutputs.map(async (candidate) => {
+                const provider =
+                  metaDecision.providerStrategy.providerOverrides[agent.id] || agent.provider || selectProvider(config);
+                const model = metaDecision.providerStrategy.modelOverrides[agent.id] || agent.model;
+                const resp = await chatComplete(
+                  [
+                    { role: "system", content: agent.system_prompt },
+                    {
+                      role: "user",
+                      content:
+                        `Critique this candidate answer and highlight weaknesses.\n` +
+                        `CandidateId: ${candidate.agent_id}\n` +
+                        `Question: ${question}\n` +
+                        `Answer:\n${candidate.content}`,
+                    },
+                  ],
+                  model,
+                  agent.temperature,
+                  { provider, providerConfig: config.llm_providers?.[provider] }
+                );
+                addUsage(
+                  summary,
+                  agent.id,
+                  provider,
+                  config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 },
+                  {
+                    inputTokens: resp.inputTokens,
+                    outputTokens: resp.outputTokens,
+                    reasoningTokens: resp.reasoningTokens,
+                  }
+                );
+                const severity = Math.min(5, Math.max(0, resp.text.length / 200));
+                return { agent_id: agent.id, candidateId: candidate.agent_id, content: resp.text, severity };
+              })
+            )
+          );
     lastCritiqueSeverity = criticOutputs.reduce((acc, c) => acc + c.severity, 0) / (criticOutputs.length || 1);
 
     // fact check
@@ -138,7 +224,16 @@ export async function runAskFlow(
         const resp = await chatComplete(
           [
             { role: "system", content: scoringAgent.system_prompt },
-            { role: "user", content: responderOutputs.map((r, idx) => `Candidate ${idx}: ${r.content}`).join("\n") },
+            {
+              role: "user",
+              content:
+                `Score each candidate answer from 0 to 10 (10 is best).\n` +
+                `Return ONLY valid JSON, either:\n` +
+                `- an array of {\"candidateId\":\"...\",\"score\":number}\n` +
+                `- or an object map {\"candidateId\": number}\n\n` +
+                `Candidates:\n` +
+                responderOutputs.map((r) => `- ${r.agent_id}: ${r.content}`).join("\n"),
+            },
           ],
           model,
           scoringAgent.temperature,
@@ -149,7 +244,10 @@ export async function runAskFlow(
           outputTokens: resp.outputTokens,
           reasoningTokens: resp.reasoningTokens,
         });
-        scores = responderOutputs.map((r, idx) => ({ candidateId: r.agent_id, score: 5 - idx }));
+        const candidateIds = responderOutputs.map((r) => r.agent_id);
+        const parsed = tryParseJson<any>(resp.text);
+        const normalized = normalizeScores(parsed, candidateIds);
+        scores = normalized || responderOutputs.map((r) => ({ candidateId: r.agent_id, score: 5 }));
       }
     }
 
@@ -189,28 +287,21 @@ export async function runAskFlow(
     finalAnswer: final.answer,
     confidence: final.confidence,
     metaExplanation: final.justification,
-    iterations: iteration + 1,
+    iterations: trace.length,
     reasoningTrace: trace,
     tokens: summary,
-    agentsUsed: agents.filter((a) => a.enabled).map((a) => a.id),
+    agentsUsed: Object.keys(summary.agentUsage || {}),
   });
   await memory.recordQuestion(question, undefined, true, final.confidence);
-  for (const c of criticOutputs) {
-    const candidate = responderOutputs.find((r) => r.agent_id === c.agent_id);
+  for (const candidate of responderOutputs) {
+    const candidateCritiques = criticOutputs.filter((c) => c.candidateId === candidate.agent_id);
+    const avgSeverity = candidateCritiques.reduce((acc, c) => acc + c.severity, 0) / (candidateCritiques.length || 1);
     await memory.recordAgentPerformance(
-      c.agent_id,
-      scores.find((s) => s.candidateId === c.agent_id)?.score || 0,
-      c.severity,
-      summary.agentUsage[c.agent_id]?.cost || 0
+      candidate.agent_id,
+      scores.find((s) => s.candidateId === candidate.agent_id)?.score || 0,
+      avgSeverity,
+      summary.agentUsage[candidate.agent_id]?.cost || 0
     );
-    if (candidate) {
-      await memory.recordAgentPerformance(
-        candidate.agent_id,
-        scores.find((s) => s.candidateId === candidate.agent_id)?.score || 0,
-        c.severity,
-        summary.agentUsage[candidate.agent_id]?.cost || 0
-      );
-    }
   }
 
   return { ...final, runId, trace, tokens: summary };

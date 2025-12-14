@@ -9,9 +9,10 @@ export function chooseFinalAnswer(
 ) {
   const aggregated = aggregateScores(candidates, criticOutputs, factChecks, scores).sort((a, b) => b.finalScore - a.finalScore);
   const top = aggregated[0];
+  const scoreText = typeof top?.finalScore === "number" ? top.finalScore.toFixed(2) : "n/a";
   return {
     answer: top?.candidate.content || "Unable to answer",
     confidence: Math.max(0, Math.min(1, (top?.finalScore || 0) / 10)),
-    justification: `Selected candidate from ${top?.candidate.agent_id || "n/a"} with adjusted score ${top?.finalScore.toFixed(2)}`,
+    justification: `Selected candidate from ${top?.candidate.agent_id || "n/a"} with adjusted score ${scoreText}`,
   };
 }

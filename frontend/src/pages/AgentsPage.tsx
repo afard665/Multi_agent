@@ -11,12 +11,22 @@ export default function AgentsPage() {
 
   // create form
   const [name, setName] = useState('')
-  const [role, setRole] = useState('')
+  const [role, setRole] = useState('responder')
   const [provider, setProvider] = useState('avalai')
   const [model, setModel] = useState('avalai-small')
   const [temperature, setTemperature] = useState(0.2)
   const [maxTokens, setMaxTokens] = useState(1024)
   const [systemPrompt, setSystemPrompt] = useState('')
+
+  const roleOptions = [
+    { value: 'responder', label: 'responder' },
+    { value: 'critic', label: 'critic' },
+    { value: 'opponent', label: 'opponent' },
+    { value: 'scoring_agent', label: 'scoring_agent' },
+    { value: 'domain_expert', label: 'domain_expert' },
+    { value: 'fact_checker', label: 'fact_checker' },
+    { value: 'self_verifier', label: 'self_verifier' },
+  ]
 
   useEffect(() => {
     load()
@@ -76,7 +86,7 @@ export default function AgentsPage() {
       enabled: true,
     } as any)
     setName('')
-    setRole('')
+    setRole('responder')
     setSystemPrompt('')
   }
 
@@ -101,7 +111,16 @@ export default function AgentsPage() {
       <Card title="Create Agent">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <input className="border p-2" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input className="border p-2" placeholder="Role" value={role} onChange={(e) => setRole(e.target.value)} />
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-500 mb-1">Role</label>
+            <select className="border p-2" value={role} onChange={(e) => setRole(e.target.value)}>
+              {roleOptions.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="flex flex-col">
             <label className="text-xs text-gray-500 mb-1">Provider</label>
@@ -139,7 +158,7 @@ export default function AgentsPage() {
         <div className="mt-3">
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60"
-            disabled={!name.trim()}
+            disabled={!name.trim() || !role}
             onClick={onCreate}
           >
             Create

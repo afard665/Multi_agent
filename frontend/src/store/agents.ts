@@ -24,22 +24,38 @@ type AgentState = {
 export const useAgentStore = create<AgentState>((set, get) => ({
   agents: [],
   load: async () => {
-    const res = await api.get('/agents')
-    set({ agents: res.data })
+    try {
+      const res = await api.get('/agents')
+      set({ agents: res.data })
+    } catch {
+      set({ agents: [] })
+    }
   },
   create: async (agent) => {
-    await api.post('/agents', agent)
+    try {
+      await api.post('/agents', agent)
+    } catch {
+      // ignore (likely missing admin key)
+    }
     await get().load()
   },
   update: async (id, patch) => {
-    await api.patch(`/agents/${id}`, patch)
+    try {
+      await api.patch(`/agents/${id}`, patch)
+    } catch {
+      // ignore (likely missing admin key)
+    }
     await get().load()
   },
   setEnabled: async (id, enabled) => {
-    if (enabled) {
-      await api.patch(`/agents/${id}`, { enabled: true })
-    } else {
-      await api.post(`/agents/${id}/disable`)
+    try {
+      if (enabled) {
+        await api.patch(`/agents/${id}`, { enabled: true })
+      } else {
+        await api.post(`/agents/${id}/disable`)
+      }
+    } catch {
+      // ignore (likely missing admin key)
     }
     await get().load()
   },

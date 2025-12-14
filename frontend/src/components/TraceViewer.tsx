@@ -59,8 +59,11 @@ export default function TraceViewer({ trace }: { trace: ReasoningTraceEntry[] })
                 <Panel title="Critiques">
                   <ul className="space-y-2 text-sm">
                     {t.criticOutputs.map((c) => (
-                      <li key={c.agent_id} className="border-b pb-2 last:border-0 last:pb-0">
-                        <div className="font-semibold">{c.agent_id}</div>
+                      <li key={`${c.agent_id}:${c.candidateId}`} className="border-b pb-2 last:border-0 last:pb-0">
+                        <div className="font-semibold">
+                          {c.agent_id}{' '}
+                          <span className="font-normal text-xs text-gray-600">→ {c.candidateId}</span>
+                        </div>
                         <div className="whitespace-pre-wrap">{c.content}</div>
                       </li>
                     ))}

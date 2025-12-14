@@ -5,9 +5,15 @@ import { ConfigStore } from "../core/configStore";
 import { PromptStore } from "../core/promptStore";
 import { MemoryStore } from "../core/memoryStore";
 import { runAskFlow } from "../core/orchestrator";
+import { adminGuard } from "../utils/auth";
+import { rateLimit } from "../utils/rateLimit";
 
 export function logsRouter(runStore: RunStore, agentStore: AgentStore, configStore: ConfigStore, promptStore: PromptStore, memoryStore: MemoryStore) {
   const router = Router();
+
+  // logs and replay may contain sensitive data and can trigger provider spend
+  router.use(adminGuard);
+
   router.get("/logs", (req, res) => {
     res.json(runStore.list());
   });
@@ -16,7 +22,7 @@ export function logsRouter(runStore: RunStore, agentStore: AgentStore, configSto
     if (!run) return res.status(404).json({ error: "not found" });
     res.json(run);
   });
-  router.post("/logs/:id/replay", async (req, res) => {
+  router.post("/logs/:id/replay", rateLimit, async (req, res) => {
     const run = runStore.get(req.params.id);
     if (!run) return res.status(404).json({ error: "not found" });
     const result = await runAskFlow(run.question, agentStore.list(), configStore.getConfig(), promptStore, memoryStore, runStore, agentStore);

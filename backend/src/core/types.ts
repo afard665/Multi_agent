@@ -90,6 +90,7 @@ export interface CandidateResponse {
 
 export interface CriticOutput {
   agent_id: string;
+  candidateId: string;
   content: string;
   severity: number;
 }

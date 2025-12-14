@@ -17,17 +17,34 @@ function fmtTs(ts?: number) {
 export default function LogsPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [selected, setSelected] = useState<any | null>(null)
+  const [error, setError] = useState<string>('')
 
   const [q, setQ] = useState('')
   const [minConfidence, setMinConfidence] = useState<number | ''>('')
 
   useEffect(() => {
-    api.get('/logs').then((res) => setLogs(res.data))
+    api
+      .get('/logs')
+      .then((res) => {
+        setLogs(res.data)
+        setError('')
+      })
+      .catch((err) => {
+        setLogs([])
+        setSelected(null)
+        setError(err?.response?.data?.error || err?.message || 'Failed to load logs')
+      })
   }, [])
 
   const load = async (id: string) => {
-    const res = await api.get(`/logs/${id}`)
-    setSelected(res.data)
+    try {
+      const res = await api.get(`/logs/${id}`)
+      setSelected(res.data)
+      setError('')
+    } catch (err: any) {
+      setSelected(null)
+      setError(err?.response?.data?.error || err?.message || 'Failed to load log')
+    }
   }
 
   const filtered = useMemo(() => {
@@ -41,6 +58,7 @@ export default function LogsPage() {
   return (
     <div className="space-y-4">
       <Card title="Run Logs">
+        {error ? <div className="text-sm text-red-600 mb-2">{error}</div> : null}
         <div className="flex flex-col md:flex-row gap-2 mb-3">
           <input className="border p-2 flex-1" placeholder="Search question…" value={q} onChange={(e) => setQ(e.target.value)} />
           <input

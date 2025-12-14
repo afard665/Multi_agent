@@ -83,17 +83,29 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   upsertProvider: async (key, payload) => {
-    await api.put(`/providers/${encodeURIComponent(key)}`, payload)
+    try {
+      await api.put(`/providers/${encodeURIComponent(key)}`, payload)
+    } catch {
+      // ignore (likely missing admin key)
+    }
     await Promise.all([get().load(), get().loadAdmin(), get().loadProviders(), get().loadProvidersAdmin()])
   },
 
   deleteProvider: async (key) => {
-    await api.delete(`/providers/${encodeURIComponent(key)}`)
+    try {
+      await api.delete(`/providers/${encodeURIComponent(key)}`)
+    } catch {
+      // ignore (likely missing admin key)
+    }
     await Promise.all([get().load(), get().loadAdmin(), get().loadProviders(), get().loadProvidersAdmin()])
   },
 
   update: async (patch) => {
-    await api.patch('/config', patch)
+    try {
+      await api.patch('/config', patch)
+    } catch {
+      // ignore (likely missing admin key)
+    }
     await Promise.all([get().load(), get().loadProviders()])
   },
 }))

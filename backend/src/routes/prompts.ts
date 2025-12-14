@@ -4,11 +4,15 @@ import { adminGuard } from "../utils/auth";
 
 export function promptsRouter(promptStore: PromptStore) {
   const router = Router();
+
+  // Prompt versions may contain sensitive instructions.
+  router.use(adminGuard);
+
   router.get("/prompts/:agentId/versions", (req, res) => {
     res.json(promptStore.list(req.params.agentId));
   });
 
-  router.post("/prompts/:agentId/rollback", adminGuard, async (req, res) => {
+  router.post("/prompts/:agentId/rollback", async (req, res) => {
     try {
       const version = await promptStore.rollback(req.params.agentId, req.body.versionId);
       res.json(version);

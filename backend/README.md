@@ -14,9 +14,11 @@ npm run build && npm start
 
 Environment variables:
 - `PORT` (default 3001)
-- `ADMIN_API_KEY` (optional) protects admin endpoints
+- `ADMIN_API_KEY` required for admin endpoints (agents/config/logs/memory/prompts)
+- `ALLOW_INSECURE_ADMIN=true` (optional) allows admin endpoints without a key (local/dev only)
 - `AVALAI_API_KEY` (optional) used to call AvalAI
 - `AVALAI_BASE_URL` (default https://api.avalai.ir/v1)
+- `META_SUPERVISOR_MODEL` (optional) override the meta-supervisor model
 
 ## Tests
 

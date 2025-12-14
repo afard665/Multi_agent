@@ -20,7 +20,7 @@ export type ReasoningTraceEntry = {
   iteration: number
   agentsRan: string[]
   responderOutputs: { agent_id: string; content: string; model?: string; provider?: string; cost?: Money }[]
-  criticOutputs: { agent_id: string; content: string; severity: number }[]
+  criticOutputs: { agent_id: string; candidateId: string; content: string; severity: number }[]
   factChecks: { agent_id: string; unsupportedClaims: string[]; confidence: number }[]
   scores: { candidateId: string; score: number }[]
   metaDecision: any
