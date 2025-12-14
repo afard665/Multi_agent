@@ -24,5 +24,10 @@ jobs:
 
     - name: Build
       run: |
+        cd backend
         npm install
-        npx webpack
+        npm run dev
+        cd ../
+        cd frontend
+        npm install
+        npm run dev
