@@ -79,9 +79,16 @@ export function retrieveEvidence(query: string, limit = 3): EvidenceItem[] {
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .filter((d) => d.score > 0.05);
-  return scored.map(({ doc }) => ({
-    docId: doc.docId,
-    title: doc.title,
-    excerpt: doc.text.slice(0, 240),
-  }));
+  return scored.map(({ doc, score }) => {
+    const lower = doc.text.toLowerCase();
+    const firstToken = queryTokens.find((t) => lower.includes(t));
+    const start = firstToken ? Math.max(0, lower.indexOf(firstToken) - 60) : 0;
+    const excerpt = doc.text.slice(start, start + 320);
+    return {
+      docId: doc.docId,
+      title: doc.title,
+      excerpt,
+      score,
+    } as EvidenceItem;
+  });
 }

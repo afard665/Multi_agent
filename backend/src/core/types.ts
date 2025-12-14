@@ -109,6 +109,7 @@ export interface EvidenceItem {
   docId: string;
   title: string;
   excerpt: string;
+  score?: number;
 }
 
 export interface MetaDecision {

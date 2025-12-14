@@ -20,6 +20,7 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
   let criticOutputs: CriticOutput[] = [];
   let factChecks: FactCheckResult[] = [];
   let scores: ScoreResult[] = [];
+  let lastEvidence: ReturnType<typeof retrieveEvidence> = [];
   const parseScoringResponse = (text: string): ScoreResult[] => {
     try {
       const parsed = JSON.parse(text);
@@ -124,6 +125,7 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
 
     // evidence retrieval
     const evidence = retrieveEvidence(question);
+    lastEvidence = evidence;
 
     // critics/opponents
     const critics = agents.filter((a) => metaDecision.plan.runCritics.includes(a.id) && a.enabled);
@@ -219,7 +221,7 @@ export async function runAskFlow(question: string, agents: AgentConfig[], config
     iteration += 1;
   }
 
-  const final = chooseFinalAnswer(responderOutputs, criticOutputs, factChecks, scores);
+  const final = chooseFinalAnswer(responderOutputs, criticOutputs, factChecks, scores, lastEvidence);
   const runId = uuidv4();
   await runs.add({
     id: runId,
