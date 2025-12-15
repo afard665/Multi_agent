@@ -38,7 +38,14 @@ function normalizeAgentConfig(obj: any, now: number): AgentConfig | null {
   };
 }
 
-export function normalizeMetaDecision(raw: any, fallbackProvider: string, agents: AgentConfig[], now = Date.now()): MetaDecision {
+export function normalizeMetaDecision(
+  raw: any,
+  fallbackProvider: string,
+  agents: AgentConfig[],
+  opts?: { maxIterationsCap?: number; now?: number }
+): MetaDecision {
+  const now = opts?.now ?? Date.now();
+  const maxIterationsCap = Math.max(1, ensureNumber(opts?.maxIterationsCap, 1));
   const plan = raw?.plan || {};
 
   const runResponders = ensureArray<string>(plan.runResponders, []).filter((id) => agents.some((a) => a.id === id));
@@ -69,10 +76,13 @@ export function normalizeMetaDecision(raw: any, fallbackProvider: string, agents
 
   // Stop criteria normalization
   const stopCriteriaRaw = raw?.stopCriteria || {};
+  const iterationBudgetRaw = ensureNumber(raw?.iterationBudget, maxIterationsCap);
+  const iterationBudget = Math.max(1, Math.min(maxIterationsCap, iterationBudgetRaw));
 
   return {
     action: raw?.action === "stop" ? "stop" : "continue",
     explanation: ensureString(raw?.explanation, ""),
+    iterationBudget,
     plan: {
       runResponders,
       runCritics,

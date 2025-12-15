@@ -1,36 +1,90 @@
 {
   "question_history": [
     {
-      "question": "test",
-      "timestamp": 1765711780680,
+      "question": "hi",
+      "timestamp": 1765723395782,
       "success": true,
-      "confidence": 0.60159929
+      "confidence": 0
     },
     {
-      "question": "test",
-      "timestamp": 1765712942368,
+      "question": "hi",
+      "timestamp": 1765724705087,
       "success": true,
-      "confidence": 0.4632997519999999
+      "confidence": 0
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765725177308,
+      "success": true,
+      "confidence": 0
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765725298634,
+      "success": true,
+      "confidence": 0
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765726587015,
+      "success": true,
+      "confidence": 0
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765787959460,
+      "success": true,
+      "confidence": 0.15499996200000002
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765788137475,
+      "success": true,
+      "confidence": 0.5
+    },
+    {
+      "question": "how can i get rich very fast ?",
+      "timestamp": 1765788955816,
+      "success": true,
+      "confidence": 0.19999894499999998
+    },
+    {
+      "question": "how can i get rich very fast ?",
+      "timestamp": 1765789010130,
+      "success": true,
+      "confidence": 0.919999515
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765790278840,
+      "success": true,
+      "confidence": 0.5
+    },
+    {
+      "question": "hi",
+      "timestamp": 1765791574959,
+      "success": true,
+      "confidence": 0.13999989499999999
     }
   ],
   "agent_performance": {
-    "critic-1": {
-      "runs": 2,
-      "totalScore": 0,
-      "totalSeverity": 5.795,
-      "totalCost": 0.0028345,
-      "avgScore": 0,
-      "avgSeverity": 2.8975,
-      "avgCost": 0.00141725
+    "responder-1": {
+      "runs": 6,
+      "totalScore": 20,
+      "totalSeverity": 2.5,
+      "totalCost": 0.006443,
+      "avgScore": 3.3333333333333335,
+      "avgSeverity": 0.4166666666666667,
+      "avgCost": 0.0010738333333333333
     },
-    "opponent-1": {
-      "runs": 2,
-      "totalScore": 0,
-      "totalSeverity": 5.96,
-      "totalCost": 0.0037595,
-      "avgScore": 0,
-      "avgSeverity": 2.98,
-      "avgCost": 0.00187975
+    "critic-1": {
+      "runs": 1,
+      "totalScore": 5,
+      "totalSeverity": 0,
+      "totalCost": 0.000317,
+      "avgScore": 5,
+      "avgSeverity": 0,
+      "avgCost": 0.000317
     }
   },
   "patterns": {

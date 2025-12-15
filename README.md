@@ -14,11 +14,20 @@ npm run dev
 ```
 Set environment variables as needed:
 - `PORT` (default 3001)
+- `ASK_API_KEY` (optional) if set, `/api/ask` requires `x-ask-key`
 - `ADMIN_API_KEY` required for admin actions (agents/config/logs/memory/prompts)
-- `ALLOW_INSECURE_ADMIN=true` (optional) allows admin actions without a key (local/dev only)
+- In local/dev (`NODE_ENV != production`), admin endpoints work without `ADMIN_API_KEY` by default.
+- `ALLOW_INSECURE_ADMIN=true` (optional) forces admin access without a key (use with care)
+- `SIMPLE_AUTH_ENABLED=true` (optional) allows `Authorization: Basic` auth (enabled by default in non-production)
+- `SIMPLE_AUTH_USER` / `SIMPLE_AUTH_PASSWORD` (optional) override Basic auth creds (defaults: `admin` / `amin@1005`)
 - `AVALAI_API_KEY` optional for AvalAI
 - `AVALAI_BASE_URL` override endpoint
 - `META_SUPERVISOR_MODEL` (optional) override the meta-supervisor model
+- `ALLOW_REQUEST_LLM_OVERRIDES=true` (optional) enables `x-llm-api-key` / `x-llm-base-url` request overrides
+- `ALLOW_PRIVATE_LLM_BASE_URLS=true` (optional) allows private/localhost base URLs (dev only)
+- `CORS_ORIGINS` (optional) comma-separated allowlist (prod default denies if unset)
+- `TRUST_PROXY` (optional) e.g. `1` when behind a proxy
+- `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` (optional) tune `/api/ask` replay rate limiting
 
 ### Live trace (WebSocket)
 The backend exposes a WebSocket server at `ws://localhost:3001/ws`.
@@ -27,6 +36,7 @@ To request a live trace stream, POST `/api/ask` with `{ "question": "...", "stre
 - `runId`
 - `liveTrace.wsUrl`
 - `liveTrace.runId`
+- `liveTrace.cancelToken` (used to cancel a running stream)
 
 The frontend uses this to subscribe and append `iteration` events into `reasoningTrace`.
 
@@ -40,12 +50,12 @@ npm run dev
 ```
 
 ## Learning + Memory
-- Question history and agent performance stored in `backend/memory/meta-memory.json`.
-- Prompt versions stored in `backend/memory/prompt-store.json` with rollback support.
-- Runs logged in `backend/logs/runs.jsonl`.
+- Runtime data is stored in `backend/memory/*.json` (gitignored).
+- Runs are logged in `backend/logs/runs.jsonl` (gitignored).
+- Example seed files are in `backend/memory/*.example.json`.
 
 ## Adding Agents
-Use the dashboard Agents page or POST `/api/agents` with admin key. Agents are persisted in `backend/memory/agents.json`.
+Use the dashboard Agents page or POST `/api/agents` with admin key. Agents are persisted in `backend/memory/agents.json` (runtime).
 
 ## Prompt Evolution
 Meta-supervisor can propose updates recorded in the prompt store. You can inspect versions via UI and rollback.

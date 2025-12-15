@@ -5,7 +5,7 @@ import { atomicWrite } from "../utils/atomicWrite";
 import { withFileLock } from "../utils/fileLock";
 import { v4 as uuidv4 } from "uuid";
 
-const promptPath = path.join(__dirname, "../../memory/prompt-store.json");
+const promptPath = process.env.PROMPT_STORE_PATH || path.join(__dirname, "../../memory/prompt-store.json");
 
 export class PromptStore {
   private versions: PromptVersion[];
@@ -56,5 +56,13 @@ export class PromptStore {
     if (!version) throw new Error("Version not found");
     await this.add(agentId, version.system_prompt, "admin", "rollback");
     return version;
+  }
+
+  async removeAgent(agentId: string) {
+    const before = this.versions.length;
+    this.versions = this.versions.filter((v) => v.agentId !== agentId);
+    if (this.versions.length !== before) {
+      await this.persist();
+    }
   }
 }

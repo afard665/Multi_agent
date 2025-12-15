@@ -2,12 +2,27 @@ import { create } from 'zustand'
 
 const LS_BASE_URL = 'client.backendBaseUrl'
 const LS_ADMIN_KEY = 'client.adminApiKey'
+const LS_ASK_KEY = 'client.askApiKey'
+const LS_WF_ALLOW_CREATE_AGENTS = 'client.workflowDesigner.allowCreateAgents'
 
 function loadString(key: string) {
   try {
     return localStorage.getItem(key) || ''
   } catch {
     return ''
+  }
+}
+
+function loadBool(key: string, defaultValue: boolean) {
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw == null) return defaultValue
+    const v = raw.trim().toLowerCase()
+    if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return true
+    if (v === '0' || v === 'false' || v === 'no' || v === 'off') return false
+    return defaultValue
+  } catch {
+    return defaultValue
   }
 }
 
@@ -20,29 +35,31 @@ function saveString(key: string, value: string) {
   }
 }
 
-const LS_LLM_PROVIDER = 'client.llmProvider'
-const LS_LLM_API_KEY = 'client.llmApiKey'
-const LS_LLM_BASE_URL = 'client.llmBaseUrl'
+function saveBool(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? 'true' : 'false')
+  } catch {
+    // ignore
+  }
+}
+
 
 export type ClientSettingsState = {
   backendBaseUrl: string
   adminApiKey: string
-  llmProvider: string
-  llmApiKey: string
-  llmBaseUrl: string
+  askApiKey: string
+  workflowDesignerAllowCreateAgents: boolean
   setBackendBaseUrl: (v: string) => void
   setAdminApiKey: (v: string) => void
-  setLlmProvider: (v: string) => void
-  setLlmApiKey: (v: string) => void
-  setLlmBaseUrl: (v: string) => void
+  setAskApiKey: (v: string) => void
+  setWorkflowDesignerAllowCreateAgents: (v: boolean) => void
 }
 
 export const useClientSettingsStore = create<ClientSettingsState>((set) => ({
   backendBaseUrl: loadString(LS_BASE_URL),
   adminApiKey: loadString(LS_ADMIN_KEY),
-  llmProvider: loadString(LS_LLM_PROVIDER),
-  llmApiKey: loadString(LS_LLM_API_KEY),
-  llmBaseUrl: loadString(LS_LLM_BASE_URL),
+  askApiKey: loadString(LS_ASK_KEY),
+  workflowDesignerAllowCreateAgents: loadBool(LS_WF_ALLOW_CREATE_AGENTS, true),
   setBackendBaseUrl: (v) => {
     const value = v.trim()
     saveString(LS_BASE_URL, value)
@@ -53,20 +70,14 @@ export const useClientSettingsStore = create<ClientSettingsState>((set) => ({
     saveString(LS_ADMIN_KEY, value)
     set({ adminApiKey: value })
   },
-  setLlmProvider: (v) => {
+  setAskApiKey: (v) => {
     const value = v.trim()
-    saveString(LS_LLM_PROVIDER, value)
-    set({ llmProvider: value })
+    saveString(LS_ASK_KEY, value)
+    set({ askApiKey: value })
   },
-  setLlmApiKey: (v) => {
-    const value = v.trim()
-    saveString(LS_LLM_API_KEY, value)
-    set({ llmApiKey: value })
-  },
-  setLlmBaseUrl: (v) => {
-    const value = v.trim()
-    saveString(LS_LLM_BASE_URL, value)
-    set({ llmBaseUrl: value })
+  setWorkflowDesignerAllowCreateAgents: (v) => {
+    saveBool(LS_WF_ALLOW_CREATE_AGENTS, !!v)
+    set({ workflowDesignerAllowCreateAgents: !!v })
   },
 }))
 
@@ -78,14 +89,10 @@ export function getStoredAdminApiKey() {
   return loadString(LS_ADMIN_KEY)
 }
 
-export function getStoredLlmProvider() {
-  return loadString(LS_LLM_PROVIDER)
+export function getStoredAskApiKey() {
+  return loadString(LS_ASK_KEY)
 }
 
-export function getStoredLlmApiKey() {
-  return loadString(LS_LLM_API_KEY)
-}
-
-export function getStoredLlmBaseUrl() {
-  return loadString(LS_LLM_BASE_URL)
+export function getStoredWorkflowDesignerAllowCreateAgents() {
+  return loadBool(LS_WF_ALLOW_CREATE_AGENTS, true)
 }

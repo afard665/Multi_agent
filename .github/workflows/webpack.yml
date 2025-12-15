@@ -1,4 +1,4 @@
-name: NodeJS with Webpack
+name: Node.js CI
 
 on:
   push:
@@ -21,13 +21,20 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
+        cache: npm
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/package-lock.json
 
-    - name: Build
+    - name: Backend - install, build, test
       run: |
         cd backend
-        npm install
-        npm run dev
-        cd ../
+        npm ci
+        npm run build
+        npm test
+
+    - name: Frontend - install, build
+      run: |
         cd frontend
-        npm install
-        npm run dev
+        npm ci
+        npm run build

@@ -4,13 +4,16 @@
     "name": "General Responder",
     "role": "responder",
     "enabled": true,
-    "system_prompt": "You are a helpful responder producing concise answers with citations.",
+    "system_prompt": "You are a helpful responder producing concise answers with citations when possible.",
     "model": "gpt-5.2",
-    "provider": "avalai",
+    "provider": "avalai2",
     "temperature": 0.6,
     "max_tokens": 512,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711459278
+    "createdAt": 1765723241421,
+    "updatedAt": 1765725672541,
+    "tags": [
+      "default"
+    ]
   },
   {
     "id": "critic-1",
@@ -19,11 +22,14 @@
     "enabled": true,
     "system_prompt": "You critique answers, finding weaknesses and unsupported claims.",
     "model": "gpt-5.2",
-    "provider": "avalai",
+    "provider": "avalai2",
     "temperature": 0.4,
     "max_tokens": 256,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711509197
+    "createdAt": 1765723241421,
+    "updatedAt": 1765725678789,
+    "tags": [
+      "default"
+    ]
   },
   {
     "id": "opponent-1",
@@ -32,49 +38,13 @@
     "enabled": true,
     "system_prompt": "Act as devil's advocate and challenge assumptions.",
     "model": "gpt-5.2",
-    "provider": "avalai",
+    "provider": "avalai2",
     "temperature": 0.5,
     "max_tokens": 256,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711525412
-  },
-  {
-    "id": "fact-1",
-    "name": "Fact Checker",
-    "role": "fact_checker",
-    "enabled": true,
-    "system_prompt": "Check factual accuracy using provided evidence and flag unsupported claims.",
-    "model": "gpt-5.2",
-    "provider": "avalai",
-    "temperature": 0.3,
-    "max_tokens": 256,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711536288
-  },
-  {
-    "id": "score-1",
-    "name": "Scoring Agent",
-    "role": "scoring_agent",
-    "enabled": true,
-    "system_prompt": "Score candidate answers from 1-10 considering accuracy and critique severity.",
-    "model": "gpt-5.2",
-    "provider": "avalai",
-    "temperature": 0.2,
-    "max_tokens": 128,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711546439
-  },
-  {
-    "id": "self-1",
-    "name": "Self Verifier",
-    "role": "self_verifier",
-    "enabled": true,
-    "system_prompt": "Ensure internal consistency and formatting, remove hallucinations.",
-    "model": "gpt-5.2",
-    "provider": "avalai",
-    "temperature": 0.2,
-    "max_tokens": 128,
-    "createdAt": 1690000000000,
-    "updatedAt": 1765711553358
+    "createdAt": 1765723241421,
+    "updatedAt": 1765725693363,
+    "tags": [
+      "default"
+    ]
   }
 ]

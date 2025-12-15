@@ -15,35 +15,40 @@ type Agent = {
 
 type AgentState = {
   agents: Agent[]
+  error?: string
   load: () => Promise<void>
   create: (agent: Partial<Agent>) => Promise<void>
   update: (id: string, patch: Partial<Agent>) => Promise<void>
   setEnabled: (id: string, enabled: boolean) => Promise<void>
+  remove: (id: string) => Promise<void>
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
   agents: [],
+  error: undefined,
   load: async () => {
     try {
       const res = await api.get('/agents')
-      set({ agents: res.data })
-    } catch {
-      set({ agents: [] })
+      set({ agents: res.data, error: undefined })
+    } catch (err: any) {
+      set({ agents: [], error: err?.response?.data?.error || err?.message || 'Failed to load agents' })
     }
   },
   create: async (agent) => {
     try {
       await api.post('/agents', agent)
-    } catch {
-      // ignore (likely missing admin key)
+      set({ error: undefined })
+    } catch (err: any) {
+      set({ error: err?.response?.data?.error || err?.message || 'Failed to create agent' })
     }
     await get().load()
   },
   update: async (id, patch) => {
     try {
       await api.patch(`/agents/${id}`, patch)
-    } catch {
-      // ignore (likely missing admin key)
+      set({ error: undefined })
+    } catch (err: any) {
+      set({ error: err?.response?.data?.error || err?.message || 'Failed to update agent' })
     }
     await get().load()
   },
@@ -54,9 +59,19 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       } else {
         await api.post(`/agents/${id}/disable`)
       }
-    } catch {
-      // ignore (likely missing admin key)
+      set({ error: undefined })
+    } catch (err: any) {
+      set({ error: err?.response?.data?.error || err?.message || 'Failed to update agent state' })
     }
     await get().load()
+  },
+  remove: async (id) => {
+    try {
+      await api.delete(`/agents/${encodeURIComponent(id)}`)
+      set({ error: undefined })
+      await get().load()
+    } catch (err: any) {
+      set({ error: err?.response?.data?.error || err?.message || 'Failed to delete agent' })
+    }
   },
 }))

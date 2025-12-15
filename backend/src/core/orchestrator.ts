@@ -93,19 +93,36 @@ export async function runAskFlow(
     runId?: string;
     onIteration?: (entry: ReasoningTraceEntry) => void;
     onFinal?: (payload: { answer: string; confidence: number; justification: string; tokens: any }) => void;
+    shouldCancel?: () => boolean;
+    signal?: AbortSignal;
   }
 ) {
   const summary = initTokenSummary();
   const trace: ReasoningTraceEntry[] = [];
   let lastCritiqueSeverity = 0;
   let iteration = 0;
+  let runMaxIterations = Math.max(1, config.maxIterations);
+  let budgetLocked = false;
   let responderOutputs: CandidateResponse[] = [];
   let criticOutputs: CriticOutput[] = [];
   let factChecks: FactCheckResult[] = [];
   let scores: ScoreResult[] = [];
 
-  while (iteration < config.maxIterations) {
-    const metaDecision = await metaSupervisor(question, iteration, memory.getData(), agents, config, lastCritiqueSeverity);
+  while (iteration < runMaxIterations) {
+    if (opts?.shouldCancel?.()) break;
+    const metaDecision = await metaSupervisor(
+      question,
+      iteration,
+      memory.getData(),
+      agents,
+      { ...config, maxIterations: runMaxIterations },
+      lastCritiqueSeverity,
+      { signal: opts?.signal }
+    );
+    if (!budgetLocked && iteration === 0 && typeof metaDecision.iterationBudget === "number" && Number.isFinite(metaDecision.iterationBudget)) {
+      runMaxIterations = Math.max(1, Math.min(runMaxIterations, Math.floor(metaDecision.iterationBudget)));
+      budgetLocked = true;
+    }
     // apply prompt updates
     for (const update of metaDecision.promptUpdates) {
       const agent = agents.find((a) => a.id === update.agentId);
@@ -128,6 +145,9 @@ export async function runAskFlow(
       if (agentStore) {
         await agentStore.add(newAgent);
       }
+
+      // store initial prompt version for new agents
+      await promptStore.add(newAgent.id, newAgent.system_prompt, "meta", "created");
     }
 
     // disable agents
@@ -144,8 +164,11 @@ export async function runAskFlow(
     const responders = agents.filter((a) => metaDecision.plan.runResponders.includes(a.id) && a.enabled);
     responderOutputs = await Promise.all(
       responders.map(async (agent) => {
+        if (opts?.shouldCancel?.()) return null as any;
         const provider = metaDecision.providerStrategy.providerOverrides[agent.id] || agent.provider || selectProvider(config);
         const model = metaDecision.providerStrategy.modelOverrides[agent.id] || agent.model;
+        const rate = config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 };
+        const maxTokens = Math.max(1, Math.min(agent.max_tokens || config.maxTokens, config.maxTokens));
         const response = await chatComplete(
           [
             { role: "system", content: agent.system_prompt },
@@ -153,17 +176,19 @@ export async function runAskFlow(
           ],
           model,
           agent.temperature,
-          { provider, providerConfig: config.llm_providers?.[provider] }
+          { provider, providerConfig: config.llm_providers?.[provider], maxTokens, signal: opts?.signal, timeoutMs: Number(process.env.LLM_TIMEOUT_MS || "") || undefined }
         );
-        addUsage(summary, agent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
+        addUsage(summary, agent.id, provider, rate, {
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
           reasoningTokens: response.reasoningTokens,
         });
+        const callCost = response.inputTokens * rate.input + response.outputTokens * rate.output + response.reasoningTokens * rate.reasoning;
         const content = appendCitationsIfMissing(response.text, citations);
-        return { agent_id: agent.id, content, model, provider, cost: summary.agentUsage[agent.id].cost, usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens } };
+        return { agent_id: agent.id, content, model, provider, cost: callCost, usage: { inputTokens: response.inputTokens, outputTokens: response.outputTokens, reasoningTokens: response.reasoningTokens } };
       })
     );
+    responderOutputs = responderOutputs.filter(Boolean);
 
     // critics/opponents
     const critics = agents.filter((a) => metaDecision.plan.runCritics.includes(a.id) && a.enabled);
@@ -173,9 +198,11 @@ export async function runAskFlow(
         : await Promise.all(
             critics.flatMap((agent) =>
               responderOutputs.map(async (candidate) => {
+                if (opts?.shouldCancel?.()) return null as any;
                 const provider =
                   metaDecision.providerStrategy.providerOverrides[agent.id] || agent.provider || selectProvider(config);
                 const model = metaDecision.providerStrategy.modelOverrides[agent.id] || agent.model;
+                const maxTokens = Math.max(1, Math.min(agent.max_tokens || config.maxTokens, config.maxTokens));
                 const resp = await chatComplete(
                   [
                     { role: "system", content: agent.system_prompt },
@@ -190,7 +217,7 @@ export async function runAskFlow(
                   ],
                   model,
                   agent.temperature,
-                  { provider, providerConfig: config.llm_providers?.[provider] }
+                  { provider, providerConfig: config.llm_providers?.[provider], maxTokens, signal: opts?.signal, timeoutMs: Number(process.env.LLM_TIMEOUT_MS || "") || undefined }
                 );
                 addUsage(
                   summary,
@@ -208,6 +235,7 @@ export async function runAskFlow(
               })
             )
           );
+    criticOutputs = (criticOutputs || []).filter(Boolean);
     lastCritiqueSeverity = criticOutputs.reduce((acc, c) => acc + c.severity, 0) / (criticOutputs.length || 1);
 
     // fact check
@@ -219,8 +247,10 @@ export async function runAskFlow(
     if (metaDecision.plan.runScoring) {
       const scoringAgent = agents.find((a) => a.role === "scoring_agent" && a.enabled);
       if (scoringAgent) {
+        if (!opts?.shouldCancel?.()) {
         const provider = metaDecision.providerStrategy.providerOverrides[scoringAgent.id] || scoringAgent.provider || selectProvider(config);
         const model = metaDecision.providerStrategy.modelOverrides[scoringAgent.id] || scoringAgent.model;
+        const maxTokens = Math.max(1, Math.min(scoringAgent.max_tokens || config.maxTokens, config.maxTokens));
         const resp = await chatComplete(
           [
             { role: "system", content: scoringAgent.system_prompt },
@@ -237,7 +267,7 @@ export async function runAskFlow(
           ],
           model,
           scoringAgent.temperature,
-          { provider, providerConfig: config.llm_providers?.[provider] }
+          { provider, providerConfig: config.llm_providers?.[provider], maxTokens, signal: opts?.signal, timeoutMs: Number(process.env.LLM_TIMEOUT_MS || "") || undefined }
         );
         addUsage(summary, scoringAgent.id, provider, config.provider_rates[provider] || config.provider_rates.default || { input: 0, output: 0, reasoning: 0 }, {
           inputTokens: resp.inputTokens,
@@ -248,6 +278,7 @@ export async function runAskFlow(
         const parsed = tryParseJson<any>(resp.text);
         const normalized = normalizeScores(parsed, candidateIds);
         scores = normalized || responderOutputs.map((r) => ({ candidateId: r.agent_id, score: 5 }));
+        }
       }
     }
 

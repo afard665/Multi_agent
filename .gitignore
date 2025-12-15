@@ -5,3 +5,10 @@ npm-debug.log
 pnpm-lock.yaml
 yarn.lock
 .env
+
+# Runtime data (do not commit)
+backend/memory/*.json
+backend/logs/*.jsonl
+
+# Keep examples
+!backend/memory/*.example.json

@@ -1,0 +1,10 @@
+[
+  {
+    "docId": "example-1",
+    "title": "Example doc",
+    "text": "This is an example document that can be used for simple keyword-based evidence retrieval.",
+    "tags": ["example"],
+    "updatedAt": 1690000000000
+  }
+]
+

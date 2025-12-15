@@ -112,9 +112,55 @@ export interface EvidenceItem {
   excerpt: string;
 }
 
+export interface WorkflowNode {
+  id: string;
+  agentId: string;
+  label?: string;
+  x: number;
+  y: number;
+}
+
+export interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+export interface WorkflowAiDesignMessage {
+  role: "system" | "user";
+  content: string;
+}
+
+export interface WorkflowAiDesign {
+  source: "ask_page";
+  question: string;
+  provider: string;
+  model: string;
+  messages: WorkflowAiDesignMessage[];
+  responseText: string;
+  createdAt: number;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  tags?: string[];
+  aiDesign?: WorkflowAiDesign;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type WorkflowSnapshot = Pick<Workflow, "id" | "name" | "description" | "nodes" | "edges" | "tags" | "aiDesign">;
+
 export interface MetaDecision {
   action: "continue" | "stop";
   explanation: string;
+  // Chosen by the Meta-Supervisor per ask, clamped to config.maxIterations.
+  // Used as a run-level iteration cap so different questions can use different budgets.
+  iterationBudget?: number;
   plan: {
     runResponders: string[];
     runCritics: string[];
@@ -159,6 +205,9 @@ export interface RunRecord {
   reasoningTrace: ReasoningTraceEntry[];
   tokens: TokenUsageSummary;
   agentsUsed: string[];
+  workflowId?: string | null;
+  workflowName?: string;
+  workflow?: WorkflowSnapshot | null;
 }
 
 export type LlmProviderConfig = {
@@ -171,7 +220,15 @@ export type LlmProviderConfig = {
 
 export interface ConfigShape {
   provider_rates: Record<string, { input: number; output: number; reasoning: number }>;
+  // When set, used as the default provider key for newly created agents (e.g. AI workflow designer).
+  // Empty => fall back to auto selection.
+  default_provider?: string;
   llm_providers?: Record<string, LlmProviderConfig>;
   maxIterations: number;
   maxTokens: number;
+  workflow_designer?: {
+    provider?: string; // empty => auto
+    model?: string; // empty => provider default
+    systemPrompt?: string;
+  };
 }

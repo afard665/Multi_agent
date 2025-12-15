@@ -14,11 +14,18 @@ npm run build && npm start
 
 Environment variables:
 - `PORT` (default 3001)
-- `ADMIN_API_KEY` required for admin endpoints (agents/config/logs/memory/prompts)
-- `ALLOW_INSECURE_ADMIN=true` (optional) allows admin endpoints without a key (local/dev only)
+- `ASK_API_KEY` (optional) if set, `/api/ask` requires `x-ask-key`
+- `ADMIN_API_KEY` required for admin endpoints in production (agents/config/logs/memory/prompts)
+- In local/dev (`NODE_ENV != production`), admin endpoints work without `ADMIN_API_KEY` by default.
+- `ALLOW_INSECURE_ADMIN=true` (optional) forces admin access without a key (use with care)
 - `AVALAI_API_KEY` (optional) used to call AvalAI
 - `AVALAI_BASE_URL` (default https://api.avalai.ir/v1)
 - `META_SUPERVISOR_MODEL` (optional) override the meta-supervisor model
+- `ALLOW_REQUEST_LLM_OVERRIDES=true` (optional) enables `x-llm-api-key` / `x-llm-base-url` request overrides
+- `ALLOW_PRIVATE_LLM_BASE_URLS=true` (optional) allows private/localhost base URLs (dev only)
+- `CORS_ORIGINS` (optional) comma-separated allowlist (prod default denies if unset)
+- `TRUST_PROXY` (optional) e.g. `1` when behind a proxy
+- `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` (optional) tune `/api/ask` rate limiting
 
 ## Tests
 

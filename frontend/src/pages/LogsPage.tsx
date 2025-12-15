@@ -4,6 +4,9 @@ import Table from '../components/Table'
 import TokenSummary from '../components/TokenSummary'
 import TraceViewer from '../components/TraceViewer'
 import { api } from '../api/client'
+import { useClientSettingsStore } from '../store/clientSettings'
+import AdminRequired from '../components/AdminRequired'
+import { useAdminStatusStore } from '../store/adminStatus'
 
 function fmtTs(ts?: number) {
   if (!ts) return ''
@@ -18,13 +21,22 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [selected, setSelected] = useState<any | null>(null)
   const [error, setError] = useState<string>('')
+  const { adminApiKey } = useClientSettingsStore()
+  const { status: adminStatus, load: loadAdminStatus } = useAdminStatusStore()
+
+  useEffect(() => {
+    loadAdminStatus()
+  }, [])
+
+  const canUseAdmin = !!adminStatus?.enabled && (adminStatus.mode === 'insecure' || !!adminApiKey)
 
   const [q, setQ] = useState('')
   const [minConfidence, setMinConfidence] = useState<number | ''>('')
 
   useEffect(() => {
+    if (!canUseAdmin) return
     api
-      .get('/logs')
+      .get('/logs?limit=200')
       .then((res) => {
         setLogs(res.data)
         setError('')
@@ -34,7 +46,7 @@ export default function LogsPage() {
         setSelected(null)
         setError(err?.response?.data?.error || err?.message || 'Failed to load logs')
       })
-  }, [])
+  }, [canUseAdmin])
 
   const load = async (id: string) => {
     try {
@@ -57,6 +69,13 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-4">
+      {!canUseAdmin && (
+        <Card title="Run Logs">
+          <AdminRequired feature="Logs" mode={adminStatus?.mode} />
+        </Card>
+      )}
+
+      {canUseAdmin && (
       <Card title="Run Logs">
         {error ? <div className="text-sm text-red-600 mb-2">{error}</div> : null}
         <div className="flex flex-col md:flex-row gap-2 mb-3">
@@ -84,8 +103,9 @@ export default function LogsPage() {
           ])}
         />
       </Card>
+      )}
 
-      {selected && (
+      {canUseAdmin && selected && (
         <Card title={`Run ${selected.id}`}>
           <div className="space-y-3">
             <div>

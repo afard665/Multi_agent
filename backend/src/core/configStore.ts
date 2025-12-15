@@ -15,9 +15,17 @@ export class ConfigStore {
   private load(): ConfigShape {
     const defaults: ConfigShape = {
       provider_rates: { default: { input: 0.000001, output: 0.000001, reasoning: 0.000001 } },
+      default_provider: "",
       llm_providers: {},
       maxIterations: 5,
       maxTokens: 2048,
+      workflow_designer: {
+        provider: "",
+        model: "",
+        systemPrompt:
+          "You are an expert workflow designer for a multi-agent LLM system. " +
+          "Design minimal, practical DAG workflows. Output strictly valid JSON only, matching the requested schema.",
+      },
     };
 
     try {
@@ -29,10 +37,11 @@ export class ConfigStore {
         ...parsed,
         provider_rates: { ...defaults.provider_rates, ...(parsed.provider_rates || {}) },
         llm_providers: { ...(parsed.llm_providers || {}) },
+        workflow_designer: { ...defaults.workflow_designer, ...(parsed.workflow_designer || {}) },
       };
 
       // If config on disk is missing new fields, persist migrated shape.
-      if (!parsed.llm_providers) {
+      if (!parsed.llm_providers || !parsed.workflow_designer || typeof parsed.default_provider !== "string") {
         try {
           fs.mkdirSync(path.dirname(configPath), { recursive: true });
           fs.writeFileSync(configPath, JSON.stringify(merged, null, 2));

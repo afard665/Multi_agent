@@ -45,7 +45,15 @@ export default function TraceViewer({ trace }: { trace: ReasoningTraceEntry[] })
                     {t.responderOutputs.map((r) => (
                       <li key={r.agent_id} className="border-b pb-2 last:border-0 last:pb-0">
                         <div className="font-semibold">
-                          {r.agent_id}{' '}
+                          {r.nodeLabel ? (
+                            <>
+                              {r.nodeLabel} <span className="font-normal text-xs text-gray-600">({r.agent_id})</span>{' '}
+                            </>
+                          ) : (
+                            <>
+                              {r.agent_id}{' '}
+                            </>
+                          )}
                           <span className="font-normal text-xs text-gray-600">
                             {r.provider ? `(${r.provider}${r.model ? ` / ${r.model}` : ''})` : ''}
                           </span>

@@ -9,6 +9,8 @@ export type LiveTraceEvent = {
 
 export class LiveTraceHub {
   private subs = new Map<string, Set<WebSocket>>();
+  private history = new Map<string, LiveTraceEvent[]>();
+  private maxHistoryEvents = 200;
 
   constructor(private wss: WebSocketServer) {
     this.wss.on("connection", (ws, req) => {
@@ -35,6 +37,18 @@ export class LiveTraceHub {
   subscribe(ws: WebSocket, runId: string) {
     if (!this.subs.has(runId)) this.subs.set(runId, new Set());
     this.subs.get(runId)!.add(ws);
+
+    // replay buffered events for late subscribers
+    const events = this.history.get(runId);
+    if (events?.length) {
+      for (const ev of events) {
+        try {
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(ev));
+        } catch {
+          // ignore
+        }
+      }
+    }
   }
 
   unsubscribeAll(ws: WebSocket) {
@@ -43,6 +57,11 @@ export class LiveTraceHub {
 
   publish(runId: string, type: LiveTraceEvent["type"], payload: any) {
     const event: LiveTraceEvent = { type, runId, payload, timestamp: Date.now() };
+    const buf = this.history.get(runId) || [];
+    buf.push(event);
+    if (buf.length > this.maxHistoryEvents) buf.splice(0, buf.length - this.maxHistoryEvents);
+    this.history.set(runId, buf);
+
     const set = this.subs.get(runId);
     if (!set || set.size === 0) return;
 
@@ -54,5 +73,10 @@ export class LiveTraceHub {
       }
       ws.send(msg);
     }
+  }
+
+  clear(runId: string) {
+    this.history.delete(runId);
+    this.subs.delete(runId);
   }
 }

@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Table from '../components/Table'
 import { api } from '../api/client'
+import { useClientSettingsStore } from '../store/clientSettings'
+import AdminRequired from '../components/AdminRequired'
+import { useAdminStatusStore } from '../store/adminStatus'
 
 type RangeKey = '24h' | '7d' | '30d' | 'all'
 
@@ -21,10 +24,19 @@ export default function TokensPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [range, setRange] = useState<RangeKey>('7d')
   const [error, setError] = useState<string>('')
+  const { adminApiKey } = useClientSettingsStore()
+  const { status: adminStatus, load: loadAdminStatus } = useAdminStatusStore()
 
   useEffect(() => {
+    loadAdminStatus()
+  }, [])
+
+  const canUseAdmin = !!adminStatus?.enabled && (adminStatus.mode === 'insecure' || !!adminApiKey)
+
+  useEffect(() => {
+    if (!canUseAdmin) return
     api
-      .get('/logs')
+      .get('/logs?limit=2000')
       .then((res) => {
         setLogs(res.data)
         setError('')
@@ -33,7 +45,7 @@ export default function TokensPage() {
         setLogs([])
         setError(err?.response?.data?.error || err?.message || 'Failed to load logs')
       })
-  }, [])
+  }, [canUseAdmin])
 
   const filtered = useMemo(() => {
     const ms = rangeToMs(range)
@@ -71,6 +83,13 @@ export default function TokensPage() {
 
   return (
     <div className="space-y-4">
+      {!canUseAdmin && (
+        <Card title="Token Usage">
+          <AdminRequired feature="Tokens and cost breakdown" mode={adminStatus?.mode} />
+        </Card>
+      )}
+
+      {canUseAdmin && (
       <Card title="Token Usage">
         {error ? <div className="text-sm text-red-600 mb-2">{error}</div> : null}
         <div className="flex items-center gap-2 mb-3 text-sm">
@@ -98,6 +117,7 @@ export default function TokensPage() {
           </div>
         </div>
       </Card>
+      )}
     </div>
   )
 }

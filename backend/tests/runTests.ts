@@ -38,10 +38,17 @@ async function testFileLockSerializes() {
 }
 
 async function testPromptStore() {
+  const promptTmp = path.join(__dirname, "tmp-prompt-store.json");
+  if (fs.existsSync(promptTmp)) fs.unlinkSync(promptTmp);
+  process.env.PROMPT_STORE_PATH = promptTmp;
+
   const store = new PromptStore();
   const version = await store.add("agent-test", "hello", "admin");
   const latest = store.latest("agent-test");
   assert(latest && latest.versionId === version.versionId, "latest prompt should match added");
+
+  if (fs.existsSync(promptTmp)) fs.unlinkSync(promptTmp);
+  delete process.env.PROMPT_STORE_PATH;
 }
 
 function testScoring() {

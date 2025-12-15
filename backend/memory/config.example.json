@@ -1,0 +1,17 @@
+{
+  "provider_rates": {
+    "default": { "input": 0.000001, "output": 0.000001, "reasoning": 0.000001 }
+  },
+  "default_provider": "openai",
+  "llm_providers": {
+    "openai": {
+      "key": "openai",
+      "displayName": "OpenAI",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "",
+      "models": ["gpt-4o-mini"]
+    }
+  },
+  "maxIterations": 5,
+  "maxTokens": 2048
+}

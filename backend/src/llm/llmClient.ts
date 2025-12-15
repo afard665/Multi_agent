@@ -36,7 +36,10 @@ async function avalaiChatComplete(
   model: string,
   temperature: number,
   provider: string,
-  overrides?: { apiKey?: string; baseUrl?: string }
+  overrides?: { apiKey?: string; baseUrl?: string },
+  maxTokens?: number,
+  signal?: AbortSignal,
+  timeoutMs?: number
 ): Promise<ChatCompletionResult> {
   const env = getEnvForProvider(provider, overrides);
   const apiKey = env.apiKey;
@@ -56,17 +59,20 @@ async function avalaiChatComplete(
   try {
     const resp = await axios.post(
       `${baseURL}/chat/completions`,
-      { model, messages, temperature },
-      { headers: { Authorization: `Bearer ${apiKey}` } }
+      { model, messages, temperature, ...(typeof maxTokens === "number" ? { max_tokens: maxTokens } : {}) },
+      { headers: { Authorization: `Bearer ${apiKey}` }, signal, timeout: timeoutMs }
     );
 
     const choice = resp.data?.choices?.[0]?.message?.content || "";
     const usage = resp.data?.usage || {};
     return {
       text: choice,
-      inputTokens: usage.input_tokens || usage.prompt_tokens || 0,
+      inputTokens: usage.input_tokens || usage.prompt_tokens || usage.total_tokens || 0,
       outputTokens: usage.output_tokens || usage.completion_tokens || 0,
-      reasoningTokens: usage.reasoning_tokens || 0,
+      reasoningTokens:
+        usage.reasoning_tokens ||
+        usage.completion_tokens_details?.reasoning_tokens ||
+        0,
       raw: resp.data,
     };
   } catch (err: any) {
@@ -100,7 +106,10 @@ async function openAiCompatibleChatComplete(
   model: string,
   temperature: number,
   provider: string,
-  overrides?: { apiKey?: string; baseUrl?: string }
+  overrides?: { apiKey?: string; baseUrl?: string },
+  maxTokens?: number,
+  signal?: AbortSignal,
+  timeoutMs?: number
 ): Promise<ChatCompletionResult> {
   const env = getEnvForProvider(provider, overrides);
   const apiKey = env.apiKey;
@@ -120,8 +129,8 @@ async function openAiCompatibleChatComplete(
   try {
     const resp = await axios.post(
       `${baseURL}/chat/completions`,
-      { model, messages, temperature },
-      { headers: { Authorization: `Bearer ${apiKey}` } }
+      { model, messages, temperature, ...(typeof maxTokens === "number" ? { max_tokens: maxTokens } : {}) },
+      { headers: { Authorization: `Bearer ${apiKey}` }, signal, timeout: timeoutMs }
     );
 
     const choice = resp.data?.choices?.[0]?.message?.content || "";
@@ -130,9 +139,12 @@ async function openAiCompatibleChatComplete(
     // OpenAI usage has prompt_tokens + completion_tokens. There's no standard reasoning_tokens.
     return {
       text: choice,
-      inputTokens: usage.prompt_tokens || 0,
-      outputTokens: usage.completion_tokens || 0,
-      reasoningTokens: usage.reasoning_tokens || 0,
+      inputTokens: usage.prompt_tokens || usage.input_tokens || usage.total_tokens || 0,
+      outputTokens: usage.completion_tokens || usage.output_tokens || 0,
+      reasoningTokens:
+        usage.reasoning_tokens ||
+        usage.completion_tokens_details?.reasoning_tokens ||
+        0,
       raw: resp.data,
     };
   } catch (err: any) {
@@ -161,6 +173,9 @@ export async function chatComplete(
   opts?: {
     provider?: LlmProvider;
     providerConfig?: { apiKey?: string; baseUrl?: string };
+    maxTokens?: number;
+    signal?: AbortSignal;
+    timeoutMs?: number;
   }
 ): Promise<ChatCompletionResult> {
   const requestOverrides = getLlmRequestOverrides();
@@ -191,8 +206,26 @@ export async function chatComplete(
   // - avalai* => AvalAI API
   // - openai* or anything else with OPENAI_BASE_URL => openai compatible
   if (provider.startsWith("avalai")) {
-    return avalaiChatComplete(messages, model, temperature, provider, effectiveOverrides);
+    return avalaiChatComplete(
+      messages,
+      model,
+      temperature,
+      provider,
+      effectiveOverrides,
+      opts?.maxTokens,
+      opts?.signal,
+      opts?.timeoutMs
+    );
   }
 
-  return openAiCompatibleChatComplete(messages, model, temperature, provider, effectiveOverrides);
+  return openAiCompatibleChatComplete(
+    messages,
+    model,
+    temperature,
+    provider,
+    effectiveOverrides,
+    opts?.maxTokens,
+    opts?.signal,
+    opts?.timeoutMs
+  );
 }

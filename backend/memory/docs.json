@@ -1,5 +1,0 @@
-[
-  {"docId":"doc1","title":"System Overview","text":"The platform coordinates responder, critic, opponent, fact_checker, scoring_agent, and self_verifier roles."},
-  {"docId":"doc2","title":"Prompt Evolution","text":"Prompt versions are tracked with versionIds allowing rollback and evolution over time."},
-  {"docId":"doc3","title":"Cost Management","text":"Provider rates define token costs with input, output, and reasoning dimensions."}
-]

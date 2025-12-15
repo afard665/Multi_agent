@@ -1,8 +1,8 @@
 import { ReactNode } from 'react'
 
-type Props = { headers: string[]; rows: ReactNode[][] }
+type Props = { headers: string[]; rows: ReactNode[][]; rowKeys?: (string | number)[] }
 
-export default function Table({ headers, rows }: Props) {
+export default function Table({ headers, rows, rowKeys }: Props) {
   return (
     <table className="min-w-full text-sm">
       <thead>
@@ -16,7 +16,7 @@ export default function Table({ headers, rows }: Props) {
       </thead>
       <tbody>
         {rows.map((r, idx) => (
-          <tr key={idx} className="border-b last:border-0">
+          <tr key={rowKeys?.[idx] ?? idx} className="border-b last:border-0">
             {r.map((c, i) => (
               <td key={i} className="p-2">
                 {c}
